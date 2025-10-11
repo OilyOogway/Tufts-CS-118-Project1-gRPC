@@ -5,6 +5,7 @@ import (
 	"crypto/md5"
 	"errors"
 	"fmt"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )
@@ -92,6 +93,27 @@ func (s Server) Connect(_ context.Context, r *Registration) (*AuthToken, error) 
 // (when you initially receive it, it will have the name of the recipient instead).
 // TODO: Implement `Send`. If any errors occur, return any error message you'd like.
 func (s Server) Send(ctx context.Context, msg *ChatMessage) (*Success, error) {
+	// Get the sending user from context
+	sender := fmt.Sprintf("%v", ctx.Value("username"))
+
+	// Check if the target user exists
+	if inbox, exists := s.Inboxes[msg.User]; exists {
+		// Create a new message with the sender's name
+		messageToSend := &ChatMessage{
+			User: sender,
+			Body: msg.Body,
+		}
+
+		// Send the message to the target user's inbox
+		select {
+		case inbox <- messageToSend:
+			return &Success{Ok: true}, nil
+		default:
+			return &Success{Ok: false}, errors.New("target user's inbox is full")
+		}
+	}
+
+	return &Success{Ok: false}, errors.New("target user not found")
 }
 
 // Implementation of the Fetch method defined in our `.proto` file.
@@ -102,6 +124,33 @@ func (s Server) Send(ctx context.Context, msg *ChatMessage) (*Success, error) {
 //
 // TODO: Implement Fetch. If any errors occur, return any error message you'd like.
 func (s Server) Fetch(ctx context.Context, _ *Empty) (*ChatMessages, error) {
+	// Get the current user from context
+	user := fmt.Sprintf("%v", ctx.Value("username"))
+
+	// Get the user's inbox
+	inbox, exists := s.Inboxes[user]
+	if !exists {
+		return &ChatMessages{Messages: []*ChatMessage{}}, errors.New("user inbox not found")
+	}
+
+	var messages []*ChatMessage
+
+	// Consume messages from the inbox in batches of BATCH_SIZE
+	for i := 0; i < BATCH_SIZE; i++ {
+		select {
+		case msg, ok := <-inbox:
+			if !ok {
+				// Channel is closed, return what we have
+				return &ChatMessages{Messages: messages}, nil
+			}
+			messages = append(messages, msg)
+		default:
+			// No more messages available, return what we have
+			return &ChatMessages{Messages: messages}, nil
+		}
+	}
+
+	return &ChatMessages{Messages: messages}, nil
 }
 
 // Implementation of the List method defined in our `.proto` file.

@@ -29,6 +29,18 @@ message Empty {}
 // TODO: Create a ChatMessages message that contains a repeated list of
 // of ChatMessage
 
+message ChatMessage {
+    // numbers are fields almost like addresses in go
+    string user = 1;
+    string body = 2;
+}
+
+message ChatMessages {
+
+    // repeated is a keyword for multiple object data structures like arrays and list
+    repeated ChatMessage messages = 1;
+}
+
 service WhatsUp {
     /* 
 
@@ -66,10 +78,12 @@ service WhatsUp {
 
     // User sends a message to another user.
     // TODO: add an RPC message called Send that takes a ChatMessage and expects a Success message
+    rpc Send(ChatMessage) returns (Success);
 
     // User fetches all messages addressed to themselves in batches. Batch size is
     // defined by the server that implements this RPC, clients cannot control it.
     // TODO: add an RPC message called Fetch that takes Empty and returns ChatMessages (note the plural!)
+    rpc Fetch(Empty) returns (ChatMessages);
 
     // User fetches a list of currently active users. 
     rpc List(Empty) returns (UserList);
