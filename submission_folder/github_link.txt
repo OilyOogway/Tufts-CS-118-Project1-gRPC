@@ -1,3 +1,0 @@
-https://github.com/OilyOogway/Tufts-CS-118-Project1-gRPC#
-
-Link to our groups github repo.
